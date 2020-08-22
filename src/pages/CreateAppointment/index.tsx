@@ -4,6 +4,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+import { Platform } from 'react-native';
 import api from '../../services/api';
 import {
   Container,
@@ -16,6 +17,10 @@ import {
   ProviderContainer,
   ProviderAvatar,
   ProviderName,
+  Calendar,
+  Title,
+  OpenDatePickerButton,
+  OpenDatePickerButtonText,
 } from './styles';
 import { useAuth } from '../../hooks/auth';
 
@@ -29,6 +34,11 @@ interface RouteParams {
   providerId: string;
 }
 
+interface AvailabilityItem {
+  hour: number;
+  available: boolean;
+}
+
 const CreateAppointment: React.FC = () => {
   const { user } = useAuth();
   const navigation = useNavigation();
@@ -37,6 +47,9 @@ const CreateAppointment: React.FC = () => {
 
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState(providerId);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [availability, setAvailability] = useState<AvailabilityItem[]>([]);
 
   useEffect(() => {
     api.get('providers').then((response) => {
@@ -44,12 +57,38 @@ const CreateAppointment: React.FC = () => {
     });
   }, []);
 
+  useEffect(() => {
+    api.get(`/providers/${selectedProvider}/day-availability`, {
+      params: {
+        year: selectedDate.getFullYear(),
+        month: selectedDate.getMonth() + 1,
+        day: selectedDate.getDate(),
+      },
+    }).then((response) => {
+      setAvailability(response.data);
+    });
+  }, [selectedDate, selectedProvider]);
+
   const navigateBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
   const handleSelectProvider = useCallback((id: string) => {
     setSelectedProvider(id);
+  }, []);
+
+  const handleToggleDatePicker = useCallback(() => {
+    setShowDatePicker((state) => !state);
+  }, []);
+
+  const handleDateChanged = useCallback((event: any, date: Date | undefined) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+
+    if (date) {
+      setSelectedDate(date);
+    }
   }, []);
 
   return (
@@ -87,7 +126,23 @@ const CreateAppointment: React.FC = () => {
         />
       </ProvidersListContainer>
 
-      <DateTimePicker value={new Date()} />
+      <Calendar>
+        <Title>Escolha a data</Title>
+
+        <OpenDatePickerButton onPress={handleToggleDatePicker}>
+          <OpenDatePickerButtonText>Selecionar outra data</OpenDatePickerButtonText>
+        </OpenDatePickerButton>
+
+        { showDatePicker && (
+          <DateTimePicker
+            mode="date"
+            display="calendar"
+            // textColor="#f4ede8"
+            onChange={handleDateChanged}
+            value={selectedDate}
+          />
+        )}
+      </Calendar>
 
     </Container>
   );
